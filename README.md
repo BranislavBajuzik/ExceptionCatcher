@@ -1,6 +1,7 @@
 # ExceptionCatcher
 
 [![Build Status](https://travis-ci.com/BranislavBajuzik/ExceptionCatcher.svg?branch=master)](https://travis-ci.com/BranislavBajuzik/ExceptionCatcher)
+[![codecov](https://codecov.io/gh/BranislavBajuzik/ExceptionCatcher/branch/master/graph/badge.svg)](https://codecov.io/gh/BranislavBajuzik/ExceptionCatcher)
 
 General wrapper for catching exceptions
 
@@ -18,7 +19,7 @@ def foo(a):
 def bar(a):
     return 1 / a
     
-print(foo())  # None
+print(foo())   # None
 print(bar(0))  # 42
 print(bar(1))  # 1
 ```

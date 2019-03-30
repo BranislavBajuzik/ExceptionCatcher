@@ -6,3 +6,7 @@ matrix:
       dist: xenial
 script:
   - pytest
+before_install:
+  - pip install --user codecov
+after_success:
+  - codecov
