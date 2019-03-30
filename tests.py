@@ -1,5 +1,11 @@
+import sys
+
+import ExceptionCatcher as E
+
+from io import StringIO
+from importlib import reload
 from unittest import TestCase
-from ExceptionCatcher import *
+from unittest.mock import patch
 
 
 def div(k):
@@ -8,10 +14,10 @@ def div(k):
 
 class TestGlobalExceptionCatcher(TestCase):
     def setUp(self):
-        ExceptionCatcher.set_output(print)
+        reload(E)
 
     def test_basic(self):
-        @ExceptionCatcher
+        @E.ExceptionCatcher
         def f(k):
             return 1 / k
 
@@ -20,25 +26,25 @@ class TestGlobalExceptionCatcher(TestCase):
         self.assertEqual(f(-1), -1)
 
     def test_with(self):
-        with ExceptionCatcher:
+        with E.ExceptionCatcher:
             div(1)
             div(0)
 
     def test_with_post_check(self):
-        with ExceptionCatcher as catcher:
+        with E.ExceptionCatcher as catcher:
             div(1)
             div(0)
         self.assertRaises(AssertionError, lambda: catcher.failed)
 
     def test_with_post_result(self):
-        with ExceptionCatcher as catcher:
+        with E.ExceptionCatcher as catcher:
             div(1)
             div(0)
         self.assertRaises(AssertionError, lambda: catcher.result)
 
     def test_keyboard_interrupt(self):
         try:
-            with ExceptionCatcher:
+            with E.ExceptionCatcher:
                 raise KeyboardInterrupt
         except KeyboardInterrupt:
             pass
@@ -49,7 +55,7 @@ class TestGlobalExceptionCatcher(TestCase):
         output = []
 
         try:
-            with ExceptionCatcher(output=output.append):
+            with E.ExceptionCatcher(output=output.append):
                 exit(0)
         except SystemExit:
             self.assertTrue(len(output) == 0)
@@ -60,7 +66,7 @@ class TestGlobalExceptionCatcher(TestCase):
         output = []
 
         try:
-            with ExceptionCatcher(output=output.append):
+            with E.ExceptionCatcher(output=output.append):
                 exit(1)
         except SystemExit:
             self.assertTrue(len(output) != 0)
@@ -68,17 +74,39 @@ class TestGlobalExceptionCatcher(TestCase):
             self.fail('Nothing Raised')
 
     def test_output(self):
-        output = []
-        ExceptionCatcher.set_output(output.append)
-
-        @ExceptionCatcher
+        @E.ExceptionCatcher
         def f(k):
             return 1 / k
 
-        f(1), f(0), f(-1)
+        with patch('sys.stdout', new=StringIO()) as captured_stdout:
+            def stdout(message: str):
+                print(message, file=sys.stdout)
 
-        output = '\n'.join(output)
-        print(output)
+            E.ExceptionCatcher.set_output(stdout)
+            f(1), f(0), f(-1)
+
+        output = captured_stdout.getvalue()
+
+        for snippet in ('f(1), f(0), f(-1)',
+                        '=Exception caught here=',
+                        'return 1 / k',
+                        'ZeroDivisionError: division by zero'):
+            self.assertIn(snippet, output)
+
+    def test_output_stderr(self):
+        @E.ExceptionCatcher
+        def f(k):
+            return 1 / k
+
+        with patch('sys.stderr', new=StringIO()) as captured_stderr:
+            def stderr(message: str):
+                print(message, file=sys.stderr)
+
+            E.ExceptionCatcher.set_output(stderr)
+
+            f(1), f(0), f(-1)
+
+        output = captured_stderr.getvalue()
 
         for snippet in ('f(1), f(0), f(-1)',
                         '=Exception caught here=',
@@ -89,11 +117,11 @@ class TestGlobalExceptionCatcher(TestCase):
 
 class TestInstanceExceptionCatcher(TestCase):
     def test_wrong_args(self):
-        self.assertRaises(TypeError, ExceptionCatcher,
+        self.assertRaises(TypeError, E.ExceptionCatcher,
                           to_wrap=lambda: None, callback=lambda: None)
 
     def test_instance(self):
-        @ExceptionCatcher()
+        @E.ExceptionCatcher()
         def f(k):
             return 1 / k
 
@@ -102,7 +130,7 @@ class TestInstanceExceptionCatcher(TestCase):
         self.assertEqual(f(-1), -1)
 
     def test_callback(self):
-        @ExceptionCatcher(callback=lambda: 69)
+        @E.ExceptionCatcher(callback=lambda: 69)
         def f(k):
             return 1 / k
 
@@ -111,27 +139,27 @@ class TestInstanceExceptionCatcher(TestCase):
         self.assertEqual(f(-1), -1)
 
     def test_with(self):
-        with ExceptionCatcher():
+        with E.ExceptionCatcher():
             div(1)
             div(0)
 
     def test_with_callback(self):
         calls = []
 
-        with ExceptionCatcher(callback=lambda: calls.append(None)):
+        with E.ExceptionCatcher(callback=lambda: calls.append(None)):
             div(1)
             div(0)
 
         self.assertEqual(calls, [None])
 
     def test_with_post_check(self):
-        with ExceptionCatcher() as catcher:
+        with E.ExceptionCatcher() as catcher:
             div(1)
             div(0)
         self.assertTrue(catcher.failed)
 
     def test_with_post_result(self):
-        with ExceptionCatcher() as catcher:
+        with E.ExceptionCatcher() as catcher:
             div(1)
             div(0)
         self.assertIsNone(catcher.result)
@@ -139,7 +167,7 @@ class TestInstanceExceptionCatcher(TestCase):
     def test_with_callback_post_check(self):
         calls = []
 
-        with ExceptionCatcher(callback=lambda: calls.append(None)) as catcher:
+        with E.ExceptionCatcher(callback=lambda: calls.append(None)) as catcher:
             div(1)
             div(0)
 
@@ -153,7 +181,7 @@ class TestInstanceExceptionCatcher(TestCase):
             calls.append(None)
             return 69
 
-        with ExceptionCatcher(callback=callback) as catcher:
+        with E.ExceptionCatcher(callback=callback) as catcher:
             div(1)
             div(0)
 
@@ -161,7 +189,7 @@ class TestInstanceExceptionCatcher(TestCase):
         self.assertEqual(catcher.result, 69)
 
     def test_exception_callback(self):
-        @ExceptionCatcher(callback=exception_callback)
+        @E.ExceptionCatcher(callback=E.exception_callback)
         def f(k):
             return 1 / k
 
@@ -172,7 +200,7 @@ class TestInstanceExceptionCatcher(TestCase):
     def test_silent(self):
         output = []
 
-        @ExceptionCatcher(silent=True, output=output.append)
+        @E.ExceptionCatcher(silent=True, output=output.append)
         def f(k):
             return 1 / k
 
@@ -183,7 +211,7 @@ class TestInstanceExceptionCatcher(TestCase):
     def test_not_silent(self):
         output = []
 
-        @ExceptionCatcher(silent=False, output=output.append)
+        @E.ExceptionCatcher(silent=False, output=output.append)
         def f(k):
             return 1 / k
 
@@ -192,16 +220,17 @@ class TestInstanceExceptionCatcher(TestCase):
         self.assertTrue(len(output) != 0)
 
     def test_output(self):
-        output = []
 
-        @ExceptionCatcher(output=output.append)
-        def f(k):
-            return 1 / k
+        with patch('sys.stdout', new=StringIO()) as captured_stdout:
+            def stdout(message: str):
+                print(message, file=sys.stdout)
 
-        f(1), f(0), f(-1)
+            @E.ExceptionCatcher(output=stdout)
+            def f(k):
+                return 1 / k
+            f(1), f(0), f(-1)
 
-        output = '\n'.join(output)
-        print(output)
+        output = captured_stdout.getvalue()
 
         for snippet in ('f(1), f(0), f(-1)',
                         '=Exception caught here=',

@@ -33,7 +33,7 @@ class __ExceptionCatcher:
 
     def set_output(self, output: Callable[[str], Any]):
         """Set default output handler"""
-        self.__class__.__output = output
+        self.__output = output
 
     @property
     def __is_global(self):
@@ -87,11 +87,11 @@ class __ExceptionCatcher:
     def __exit__(self, exc_type, exc_val, exc_tb):
         ret = False
 
-        if exc_type is not None and \
-                (exc_type is not SystemExit or exc_val.code != 0):
+        if exc_type is not None:
             ret = exc_type not in (SystemExit, KeyboardInterrupt)
 
-            if not self.__silent:
+            if not self.__silent and \
+                    (exc_type is not SystemExit or exc_val.code != 0):
                 before = traceback.format_list(traceback.extract_stack())[:-2]
                 after = traceback.format_list(traceback.extract_tb(exc_tb))
 
