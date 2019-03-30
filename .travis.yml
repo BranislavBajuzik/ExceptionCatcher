@@ -5,7 +5,7 @@ matrix:
     - python: 3.7
       dist: xenial
 script:
-  - pytest
+  - coverage run tests.py
 before_install:
   - pip install codecov
 after_success:
