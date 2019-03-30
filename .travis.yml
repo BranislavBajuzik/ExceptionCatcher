@@ -5,7 +5,7 @@ matrix:
     - python: 3.7
       dist: xenial
 script:
-  - coverage run -m unittest tests.py
+  - coverage run --include=ExceptionCatcher.py -m unittest tests.py
 before_install:
   - pip install codecov
 after_success:
