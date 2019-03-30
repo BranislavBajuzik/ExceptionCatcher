@@ -6,6 +6,7 @@ from io import StringIO
 from importlib import reload
 from unittest import TestCase
 from unittest.mock import patch
+from functools import partial
 
 
 def div(k):
@@ -79,10 +80,6 @@ class TestGlobalExceptionCatcher(TestCase):
             return 1 / k
 
         with patch('sys.stdout', new=StringIO()) as captured_stdout:
-            def stdout(message: str):
-                print(message, file=sys.stdout)
-
-            E.ExceptionCatcher.set_output(stdout)
             f(1), f(0), f(-1)
 
         output = captured_stdout.getvalue()
@@ -93,16 +90,43 @@ class TestGlobalExceptionCatcher(TestCase):
                         'ZeroDivisionError: division by zero'):
             self.assertIn(snippet, output)
 
+    def test_output_default_setter(self):
+        @E.ExceptionCatcher
+        def f(k):
+            return 1 / k
+
+        @E.ExceptionCatcher
+        def g(k):
+            return 1 / k
+
+        with patch('sys.stderr', new=StringIO()) as captured_stderr, \
+                patch('sys.stdout', new=StringIO()) as captured_stdout:
+            E.ExceptionCatcher.set_output(partial(print, file=sys.stderr))
+            f(1), f(0), f(-1)
+            E.ExceptionCatcher.set_output(print)
+            g(1), g(0), g(-1)
+
+        captured_stderr = captured_stderr.getvalue()
+        captured_stdout = captured_stdout.getvalue()
+
+        for snippet in ('=Exception caught here=',
+                        'return 1 / k',
+                        'ZeroDivisionError: division by zero'):
+            self.assertIn(snippet, captured_stderr)
+            self.assertIn(snippet, captured_stdout)
+
+        self.assertIn('f(1), f(0), f(-1)', captured_stderr)
+        self.assertIn('g(1), g(0), g(-1)', captured_stdout)
+        self.assertNotIn('g(1), g(0), g(-1)', captured_stderr)
+        self.assertNotIn('f(1), f(0), f(-1)', captured_stdout)
+
     def test_output_stderr(self):
         @E.ExceptionCatcher
         def f(k):
             return 1 / k
 
         with patch('sys.stderr', new=StringIO()) as captured_stderr:
-            def stderr(message: str):
-                print(message, file=sys.stderr)
-
-            E.ExceptionCatcher.set_output(stderr)
+            E.ExceptionCatcher.set_output(partial(print, file=sys.stderr))
 
             f(1), f(0), f(-1)
 
@@ -116,9 +140,8 @@ class TestGlobalExceptionCatcher(TestCase):
 
 
 class TestInstanceExceptionCatcher(TestCase):
-    def test_wrong_args(self):
-        self.assertRaises(TypeError, E.ExceptionCatcher,
-                          to_wrap=lambda: None, callback=lambda: None)
+    def setUp(self):
+        reload(E)
 
     def test_instance(self):
         @E.ExceptionCatcher()
@@ -129,8 +152,27 @@ class TestInstanceExceptionCatcher(TestCase):
         self.assertIsNone(f(0))
         self.assertEqual(f(-1), -1)
 
+    def test_lambda(self):
+        f = E.ExceptionCatcher(lambda k: 1/k, callback=lambda: 69)
+
+        self.assertEqual(f(1), 1)
+        self.assertEqual(f(0), 69)
+        self.assertEqual(f(-1), -1)
+
     def test_callback(self):
         @E.ExceptionCatcher(callback=lambda: 69)
+        def f(k):
+            return 1 / k
+
+        self.assertEqual(f(1), 1)
+        self.assertEqual(f(0), 69)
+        self.assertEqual(f(-1), -1)
+
+    def test_callback_no_name(self):
+        def callback(k):
+            return k
+
+        @E.ExceptionCatcher(callback=partial(callback, 69))
         def f(k):
             return 1 / k
 
@@ -220,12 +262,8 @@ class TestInstanceExceptionCatcher(TestCase):
         self.assertTrue(len(output) != 0)
 
     def test_output(self):
-
         with patch('sys.stdout', new=StringIO()) as captured_stdout:
-            def stdout(message: str):
-                print(message, file=sys.stdout)
-
-            @E.ExceptionCatcher(output=stdout)
+            @E.ExceptionCatcher
             def f(k):
                 return 1 / k
             f(1), f(0), f(-1)
@@ -237,3 +275,30 @@ class TestInstanceExceptionCatcher(TestCase):
                         'return 1 / k',
                         'ZeroDivisionError: division by zero'):
             self.assertIn(snippet, output)
+
+    def test_output_default(self):
+        with patch('sys.stderr', new=StringIO()) as captured_stderr, \
+                patch('sys.stdout', new=StringIO()) as captured_stdout:
+            @E.ExceptionCatcher(output=partial(print, file=sys.stderr))
+            def f(k):
+                return 1 / k
+            f(1), f(0), f(-1)
+
+            @E.ExceptionCatcher
+            def g(k):
+                return 1 / k
+            g(1), g(0), g(-1)
+
+        captured_stderr = captured_stderr.getvalue()
+        captured_stdout = captured_stdout.getvalue()
+
+        for snippet in ('=Exception caught here=',
+                        'return 1 / k',
+                        'ZeroDivisionError: division by zero'):
+            self.assertIn(snippet, captured_stderr)
+            self.assertIn(snippet, captured_stdout)
+
+        self.assertIn('f(1), f(0), f(-1)', captured_stderr)
+        self.assertIn('g(1), g(0), g(-1)', captured_stdout)
+        self.assertNotIn('g(1), g(0), g(-1)', captured_stderr)
+        self.assertNotIn('f(1), f(0), f(-1)', captured_stdout)

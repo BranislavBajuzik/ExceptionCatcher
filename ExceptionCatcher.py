@@ -11,7 +11,7 @@ __all__ = ['ExceptionCatcher', 'exception_callback']
 class __ExceptionCatcher:
     __output = print
 
-    def __init__(self,
+    def __init__(self, *,
                  callback: Callable[[], Any] = None,
                  silent: bool = False,
                  output: Callable[[str], Any] = None):
@@ -31,14 +31,15 @@ class __ExceptionCatcher:
         if output is not None:
             self.__output = output
 
-    def set_output(self, output: Callable[[str], Any]):
+    @classmethod
+    def set_output(cls, output: Callable[[str], Any]):
         """Set default output handler"""
-        self.__output = output
+        cls.__output = output
 
     @property
     def __is_global(self):
-        """Check if :param self: is created as an instance or not"""
-        return id(self) == id(ExceptionCatcher)
+        """Check if :param self: was created as an instance or not"""
+        return self is ExceptionCatcher
 
     @property
     def failed(self):
@@ -54,18 +55,16 @@ class __ExceptionCatcher:
                                      'ExceptionCatcher, use an instance instead'
         return self.__result
 
-    def __call__(self,
-                 to_wrap=None,
-                 *,
-                 callback: Callable[[], Any] = None,
-                 silent: bool = False,
-                 output: Callable[[str], Any] = None):
-        if to_wrap is not None and callback is not None:
-            raise TypeError('Both \'to_wrap\' and \'callback\' were provided')
-
+    def __call__(self, to_wrap=None, **options):
+        # Called with brackets
         if to_wrap is None:
-            return self.__class__(callback, silent, output)
+            return self.__class__(**options)
 
+        # Called inline
+        if options:
+            self = self.__class__(**options)
+
+        # Called as function wrapper
         @wraps(to_wrap)
         def ExceptionCatcher(*args, **kwargs):
             ok = False
@@ -90,6 +89,7 @@ class __ExceptionCatcher:
         if exc_type is not None:
             ret = exc_type not in (SystemExit, KeyboardInterrupt)
 
+            # Output callstack
             if not self.__silent and \
                     (exc_type is not SystemExit or exc_val.code != 0):
                 before = traceback.format_list(traceback.extract_stack())[:-2]
@@ -102,13 +102,17 @@ class __ExceptionCatcher:
                 self.__output(''.join(chain(before, after)))
                 self.__output(f'{exc_type.__name__}: {exc_val}')
 
+        # Handle callback
         if ret and self.__callback is not None:
             if not self.__silent:
-                callback = str(self.__callback)
-                if hasattr(self.__callback, '__name__'):
+                try:
                     callback = self.__callback.__name__
+                except AttributeError:
+                    callback = str(self.__callback)
+
                 self.__output(f'\nCallback \'{callback}\' provided, executing.')
-            with ExceptionCatcher(silent=self.__silent):
+
+            with ExceptionCatcher(silent=self.__silent, output=self.__output):
                 self.__result = self.__callback()
 
         self.__failed = ret
