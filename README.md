@@ -1,5 +1,7 @@
 # ExceptionCatcher
 
+[![Build Status](https://travis-ci.com/BranislavBajuzik/ExceptionCatcher.svg?branch=master)](https://travis-ci.com/BranislavBajuzik/ExceptionCatcher)
+
 General wrapper for catching exceptions
 
 Any exception (Except for `KeyboardInterrupt` and `SystemExit`) raised inside ExceptionCatcher context will be caught and suppressed and the whole traceback will be printed out.
