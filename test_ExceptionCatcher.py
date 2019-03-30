@@ -7,6 +7,9 @@ def div(k):
 
 
 class TestGlobalExceptionCatcher(TestCase):
+    def setUp(self):
+        ExceptionCatcher.set_output(print)
+
     def test_basic(self):
         @ExceptionCatcher
         def f(k):
@@ -63,6 +66,25 @@ class TestGlobalExceptionCatcher(TestCase):
             self.assertTrue(len(output) != 0)
         else:
             self.fail('Nothing Raised')
+
+    def test_output(self):
+        output = []
+        ExceptionCatcher.set_output(output.append)
+
+        @ExceptionCatcher
+        def f(k):
+            return 1 / k
+
+        f(1), f(0), f(-1)
+
+        output = '\n'.join(output)
+        print(output)
+
+        for snippet in ('f(1), f(0), f(-1)',
+                        '=Exception caught here=',
+                        'return 1 / k',
+                        'ZeroDivisionError: division by zero'):
+            self.assertIn(snippet, output)
 
 
 class TestInstanceExceptionCatcher(TestCase):
